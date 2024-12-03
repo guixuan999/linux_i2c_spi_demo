@@ -79,6 +79,9 @@ void read_device_id(int spi_fd) {
     printf("Device ID: %02X %02X %02X\n", rx[1], rx[2], rx[3]);
 }
 
+// W25Q16：Instruction "Read Data(0x03)"--->
+//    the entire memory can be accessed with a single instruction as long as the 
+//    clock continues. The instruction is completed by driving /CS high.
 void read_data(int spi_fd, uint32_t address, uint8_t *buffer, size_t length) {
     uint8_t cmd[4] = {
         0x03,                     // 标准读取命令
@@ -173,7 +176,15 @@ void wait_for_ready(int spi_fd) {
     }
 }
 
-// both write_data and write_data_x work! 
+// both write_data and write_data_x work!
+// W25Q16：
+//    If an entire 256 byte page is to be programmed, the last address byte (the 8 least significant address bits) 
+//    should be set to 0. If the last address byte is not zero, and the number of clocks exceeds the remaining 
+//    page length, the addressing will wrap to the beginning of the page. In some cases, less than 256 bytes (a 
+//    partial page) can be programmed without having any effect on other bytes within the same page. One 
+//    condition to perform a partial page program is that the number of clocks cannot exceed the remaining page 
+//    length. If more than 256 bytes are sent to the device the addressing will wrap to the beginning of the page 
+//    and overwrite previously sent data. 
 void write_data(int spi_fd, uint32_t address, const uint8_t *data, size_t length) {
     write_enable(spi_fd);
 
