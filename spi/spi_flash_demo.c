@@ -9,6 +9,8 @@
 
 // SPI 配置参数
 #define SPI_DEVICE "/dev/spidev0.0"
+// for OrangePi 3B
+// #define SPI_DEVICE "/dev/spidev3.0"
 #define SPI_MODE SPI_MODE_0
 #define SPI_BITS_PER_WORD 8
 #define SPI_SPEED 500000  // 500 kHz

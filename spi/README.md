@@ -1,8 +1,15 @@
 # 引脚
 ![](引脚.png)
+# cross-compile toolchain
+```shell
+sudo apt install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+```
 # 编译
 ```shell
-gcc -o spi spi_flash_demo.c
+mkdir build
+cd build
+cmake -DCMAKE_TOOLCHAIN_FILE=../toolchain-arm64.cmake ..
+make
 ```
 # flashrom
 
@@ -75,3 +82,22 @@ sudo flashrom -p linux_spi:dev=/dev/spidev0.0 -E
 # 参考
 
 Raspberry Pi I2C_SPI Demo.mhtml
+
+
+# for Luckfox Pico Pro (RV1106)
+## cross-compile toolchain
+- for Buildroot system: refer to https://wiki.luckfox.com/zh/Luckfox-Pico/Luckfox-Pico-RV1106/Luckfox-Pico-Pro-Max/Luckfox-Pico-quick-start
+- for Ubuntu system: 
+```shell
+sudo apt install gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+```
+## build
+```shell
+mkdir build
+cd build
+# for Buildroot system
+cmake -DCMAKE_TOOLCHAIN_FILE=../toolchain-arm-rockchip830-linux-uclibcgnueabihf.cmake ..
+# for Ubuntu system
+# cmake -DCMAKE_TOOLCHAIN_FILE=../toolchain-arm-linux-gnueabihf.cmake ..
+make
+```
