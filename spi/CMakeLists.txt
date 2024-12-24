@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # 项目名称
-project(spi_demo VERSION 1.0 LANGUAGES C)
+project(spiflash VERSION 1.0 LANGUAGES C)
 
 # 设置 C 标准
 set(CMAKE_C_STANDARD 11)

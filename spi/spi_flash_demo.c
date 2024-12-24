@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <ctype.h>
+
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -15,7 +17,8 @@
 #define SPI_BITS_PER_WORD 8
 #define SPI_SPEED 500000  // 500 kHz
 
-#define FLASH_SIZE (2*1024*1024) // 2MB
+//#define FLASH_SIZE (2*1024*1024) // 2MB for w25q16 (winbond)
+#define FLASH_SIZE (128*1024) // 128KB for p25d09h (Puya Semiconductor)
 #define FLASH_PAGE_SIZE 256
 #define FLASH_PAGES (FLASH_SIZE / FLASH_PAGE_SIZE)
 #define FLASH_PAGES_PER_SECTOR 16
@@ -275,42 +278,115 @@ void erase_chip(int spi_fd) {
     printf("Chip erased successfully.\n");
 }
 
+void read_bin() 
+{
+    FILE *file = fopen("auto_test.bin", "rb");
+    if (!file) {
+        perror("Error opening file");
+        return;
+    }
 
-int main() {
-    int spi_fd = spi_init(SPI_DEVICE);
+    uint8_t buffer[256];
+    size_t bytesRead;
+    size_t address = 0;
 
+    while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0) {
+        // Print the starting address of the block
+        printf("%08zx:\n", address);
+
+        // Print the bytes in %02x format
+        for (size_t i = 0; i < bytesRead; i++) {
+            printf("%02x ", buffer[i]);
+
+            // Print a newline every 16 bytes for better readability
+            if ((i + 1) % 16 == 0) {
+                printf("\n");
+            }
+        }
+
+        // Add a newline if the last line was not complete
+        if (bytesRead % 16 != 0) {
+            printf("\n");
+        }
+
+        address += bytesRead;
+    }
+
+    fclose(file);
+}
+
+void usage(char* program_name) {
+    fprintf(stderr, "Usage: %s flash <binary_file> [start_page]\n", program_name);
+    fprintf(stderr, "     : %s dump <binary_file> [start_page]\n", program_name);
+    fprintf(stderr, "     : %s read [start_page] [pages]\n", program_name);
+    fprintf(stderr, "     : %s erase\n", program_name);
+    fprintf(stderr, "     : %s test\n", program_name);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Notes: flash - erase chip then write [binary_file] into chip, starting from [start_page]\n");
+    fprintf(stderr, "     : dump  - dump data in chip, starting from [start_page], into [binary_file]\n");
+    fprintf(stderr, "     : read  - read [pages] pages of chip data starting from [start_page], and write to stdout\n");
+    fprintf(stderr, "     : erase - erase chip\n");
+    fprintf(stderr, "     : test  - spi flash read/write test\n");
+    fprintf(stderr, "     : [start_page] defaults to 0, [pages] defaults to 1\n");
+    fprintf(stderr, "     : 1 page has 256 bytes\n");
+}
+
+int is_integer(const char *str) {
+    // Handle empty string
+    if (str == NULL || *str == '\0') {
+        return 0;
+    }
+
+    // Check for optional sign
+    if (*str == '-' || *str == '+') {
+        str++;
+    }
+
+    // Ensure the rest are digits
+    while (*str) {
+        if (!isdigit((unsigned char)*str)) {
+            return 0;
+        }
+        str++;
+    }
+
+    return 1;
+}
+
+void spi_flash_test(int spi_fd) {
     // 读取设备 ID
     read_device_id(spi_fd);
 
-    // erase_chip(spi_fd);
-
-    // 写入数据
-    uint8_t data_to_write[FLASH_PAGE_SIZE];
-    for(int i = 0; i < FLASH_PAGE_SIZE; i++) {
-        *(data_to_write + i) = i;
-    }
+    //erase_chip(spi_fd);
 
     int sector = 0;
     int page = 0;
-    erase_sector(spi_fd, sector * FLASH_SECTOR_SIZE);
-    for(int i = 0; i < FLASH_PAGES_PER_SECTOR; i++) {
-        page = sector * FLASH_PAGES_PER_SECTOR + i;
-        write_data(spi_fd, page * FLASH_PAGE_SIZE, data_to_write, sizeof(data_to_write));
-    }
-    
-    sector = FLASH_SECTORS - 1; // the last sector
-    erase_sector(spi_fd, sector * FLASH_SECTOR_SIZE);
-    for(int i = 0; i < FLASH_PAGES_PER_SECTOR; i++) {
-        page = sector * FLASH_PAGES_PER_SECTOR + i;
-        write_data(spi_fd, page * FLASH_PAGE_SIZE, data_to_write, sizeof(data_to_write));
-    }
 
-    sector = 3;
-    erase_sector(spi_fd, sector * FLASH_SECTOR_SIZE);
-    for(int i = 0; i < FLASH_PAGES_PER_SECTOR; i++) {
-        page = sector * FLASH_PAGES_PER_SECTOR + i;
-        write_data(spi_fd, page * FLASH_PAGE_SIZE + 7, data_to_write, 17);
-    }
+    // 写入数据
+    // uint8_t data_to_write[FLASH_PAGE_SIZE];
+    // for(int i = 0; i < FLASH_PAGE_SIZE; i++) {
+    //     *(data_to_write + i) = i;
+    // }
+    
+    // erase_sector(spi_fd, sector * FLASH_SECTOR_SIZE);
+    // for(int i = 0; i < FLASH_PAGES_PER_SECTOR; i++) {
+    //     page = sector * FLASH_PAGES_PER_SECTOR + i;
+    //     write_data(spi_fd, page * FLASH_PAGE_SIZE, data_to_write, sizeof(data_to_write));
+    // }
+    
+    // sector = FLASH_SECTORS - 1; // the last sector
+    // erase_sector(spi_fd, sector * FLASH_SECTOR_SIZE);
+    // for(int i = 0; i < FLASH_PAGES_PER_SECTOR; i++) {
+    //     page = sector * FLASH_PAGES_PER_SECTOR + i;
+    //     write_data(spi_fd, page * FLASH_PAGE_SIZE, data_to_write, sizeof(data_to_write));
+    // }
+
+    // sector = 3;
+    // erase_sector(spi_fd, sector * FLASH_SECTOR_SIZE);
+    // for(int i = 0; i < FLASH_PAGES_PER_SECTOR; i++) {
+    //     page = sector * FLASH_PAGES_PER_SECTOR + i;
+    //     write_data(spi_fd, page * FLASH_PAGE_SIZE + 7, data_to_write, 17);
+    // }
     
     // 读取数据
     uint8_t buffer[FLASH_PAGE_SIZE];
@@ -329,12 +405,147 @@ int main() {
     page = sector * FLASH_PAGES_PER_SECTOR;
     read_data(spi_fd, page * FLASH_PAGE_SIZE + 13, buffer, 15);
     printf("Read Data @0x%06x: \n%s\n",  page * FLASH_PAGE_SIZE + 13, HexString(buffer, 15));
-    
-    close(spi_fd);
-    return 0;
 }
 
-static uint8_t HexStringBuf[FLASH_PAGE_SIZE * 3];
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        usage(argv[0]);
+        return 1;
+    }
+
+    int spi_fd = spi_init(SPI_DEVICE);
+
+    if(strcmp(argv[1], "read") == 0) {
+        int start_page = 0;
+        int pages = 1;
+        if(argc >= 3) {
+            if(!is_integer(argv[2])) {
+                usage(argv[0]);
+                goto FAIL;
+            }
+            if((start_page = atoi(argv[2])) < 0) {
+                usage(argv[0]);
+                goto FAIL;
+            }
+        }
+        if(argc >= 4) {
+            if(!is_integer(argv[3])) {
+                usage(argv[0]);
+                goto FAIL;
+            }
+            if((pages = atoi(argv[3])) < 1){
+                usage(argv[0]);
+                goto FAIL;
+            }
+        }
+        printf("Reading: start_page=%d, pages=%d\n\n", start_page, pages);
+        uint8_t buffer[FLASH_PAGE_SIZE];
+        for(int i = start_page; i < start_page + pages; i++) {
+            read_data(spi_fd, i * FLASH_PAGE_SIZE, buffer, sizeof(buffer));
+            printf("0x%06x: \n%s\n", i * FLASH_PAGE_SIZE, HexString(buffer, sizeof(buffer)));
+        }
+    } else if(strcmp(argv[1], "flash") == 0) {
+        char* fn = NULL;
+        int start_page = 0;
+        if(argc >= 3) {
+            fn = argv[2];
+        }
+        if(argc >= 4) {
+            if(!is_integer(argv[3])) {
+                usage(argv[0]);
+                goto FAIL;
+            }
+            if((start_page = atoi(argv[3])) < 0 || start_page > (FLASH_PAGES - 1)){
+                usage(argv[0]);
+                goto FAIL;
+            }
+        }
+        if(fn == NULL) {
+            usage(argv[0]);
+            goto FAIL;
+        }
+        FILE *file = fopen(fn, "rb");
+        if (!file) {
+            perror("Error opening file");
+            goto FAIL;
+        }
+        printf("Flashing: start_page=%d, file=%s\n\n", start_page, fn);
+        erase_chip(spi_fd);
+        uint8_t buffer[FLASH_PAGE_SIZE];
+        size_t bytesRead;
+        size_t total_read = 0;
+        int page = start_page;
+        while ((bytesRead = fread(buffer, 1, sizeof(buffer), file)) > 0) {
+            total_read += bytesRead;
+            if(bytesRead == sizeof(buffer)) {
+                write_data(spi_fd, page * FLASH_PAGE_SIZE, buffer, bytesRead);
+                page++;
+            } else {
+                // read bytes less than FLASH_PAGE_SIZE, take this as the last block from file (migth not be right ,but this is for simplification)
+                write_data(spi_fd, page * FLASH_PAGE_SIZE, buffer, bytesRead);
+                break;
+            }
+        }
+        printf("flashed %d bytes, please check!\n", total_read);
+        fclose(file);
+    } else if(strcmp(argv[1], "dump") == 0) {
+        char* fn = NULL;
+        int start_page = 0;
+        if(argc >= 3) {
+            fn = argv[2];
+        }
+        if(argc >= 4) {
+            if(!is_integer(argv[3])) {
+                usage(argv[0]);
+                goto FAIL;
+            }
+            if((start_page = atoi(argv[3])) < 0 || start_page > (FLASH_PAGES - 1)){
+                usage(argv[0]);
+                goto FAIL;
+            }
+        }
+        if(fn == NULL) {
+            usage(argv[0]);
+            goto FAIL;
+        }
+        FILE *file = fopen(fn, "wb");
+        if (!file) {
+            perror("Error opening file");
+            goto FAIL;
+        }
+        printf("dumping, start_page=%d, file=%s\n\n", start_page, fn);
+        uint8_t buffer[FLASH_PAGE_SIZE];
+        for(int i = start_page; i < FLASH_PAGES; i++) {
+            read_data(spi_fd, i * FLASH_PAGE_SIZE, buffer, sizeof(buffer));
+            size_t bytesWrote;
+            if((bytesWrote = fwrite(buffer, 1, sizeof(buffer), file)) != sizeof(buffer)) {
+                perror("Error writting file");
+                fclose(file);
+                goto FAIL;
+            }
+        }
+        fclose(file);
+    } else if(strcmp(argv[1], "erase") == 0) {
+        printf("Erasing...\n\n");
+        erase_chip(spi_fd);
+    } else if(strcmp(argv[1], "test") == 0) {
+        printf("Testing...\n\n");
+        spi_flash_test(spi_fd);
+    } else {
+        usage(argv[0]);
+        close(spi_fd);
+        goto FAIL;
+    }
+
+    close(spi_fd);
+    return 0;
+
+FAIL:
+    close(spi_fd);
+    return 1;
+}
+
+static uint8_t HexStringBuf[FLASH_PAGE_SIZE * 3 + FLASH_PAGE_SIZE / 16]; // add a \n for each 16-bytes
 static uint8_t *HexString(uint8_t *pBuf, size_t size)
 {
     if (size == 0)
@@ -351,6 +562,9 @@ static uint8_t *HexString(uint8_t *pBuf, size_t size)
         else
         {
             sprintf(HexStringBuf + strlen(HexStringBuf), "%02x ", pBuf[i]);
+        }
+        if (((i+1) % 16) == 0) {
+            sprintf(HexStringBuf + strlen(HexStringBuf), "\n");
         }
     }
     return HexStringBuf;
