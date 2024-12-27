@@ -317,17 +317,17 @@ void read_bin()
 
 void usage(char* program_name) {
     fprintf(stderr, "Usage: %s flash <binary_file> [start_page]\n", program_name);
-    fprintf(stderr, "     : %s dump <binary_file> [start_page]\n", program_name);
+    fprintf(stderr, "     : %s dump <binary_file> [start_page] [pages]\n", program_name);
     fprintf(stderr, "     : %s read [start_page] [pages]\n", program_name);
     fprintf(stderr, "     : %s erase\n", program_name);
     fprintf(stderr, "     : %s test\n", program_name);
     fprintf(stderr, "\n");
     fprintf(stderr, "Notes: flash - erase chip then write [binary_file] into chip, starting from [start_page]\n");
-    fprintf(stderr, "     : dump  - dump data in chip, starting from [start_page], into [binary_file]\n");
+    fprintf(stderr, "     : dump  - dump [pages] pages data in chip, starting from [start_page], into [binary_file]\n");
     fprintf(stderr, "     : read  - read [pages] pages of chip data starting from [start_page], and write to stdout\n");
     fprintf(stderr, "     : erase - erase chip\n");
     fprintf(stderr, "     : test  - spi flash read/write test\n");
-    fprintf(stderr, "     : [start_page] defaults to 0, [pages] defaults to 1\n");
+    fprintf(stderr, "     : [start_page] defaults to 0, [pages] defaults to 1(for dump, defaluts to the chip's last page)\n");
     fprintf(stderr, "     : 1 page has 256 bytes\n");
 }
 
@@ -491,6 +491,7 @@ int main(int argc, char *argv[]) {
     } else if(strcmp(argv[1], "dump") == 0) {
         char* fn = NULL;
         int start_page = 0;
+        int pages = FLASH_PAGES;
         if(argc >= 3) {
             fn = argv[2];
         }
@@ -504,6 +505,16 @@ int main(int argc, char *argv[]) {
                 goto FAIL;
             }
         }
+        if(argc >= 5) {
+            if(!is_integer(argv[4])) {
+                usage(argv[0]);
+                goto FAIL;
+            }
+            if((pages = atoi(argv[4])) < 1 || (pages + start_page) > FLASH_PAGES){
+                usage(argv[0]);
+                goto FAIL;
+            }
+        }
         if(fn == NULL) {
             usage(argv[0]);
             goto FAIL;
@@ -513,9 +524,9 @@ int main(int argc, char *argv[]) {
             perror("Error opening file");
             goto FAIL;
         }
-        printf("dumping, start_page=%d, file=%s\n\n", start_page, fn);
+        printf("dumping, start_page=%d, pages=%d,file=%s\n\n", start_page, pages, fn);
         uint8_t buffer[FLASH_PAGE_SIZE];
-        for(int i = start_page; i < FLASH_PAGES; i++) {
+        for(int i = start_page; i < start_page + pages; i++) {
             read_data(spi_fd, i * FLASH_PAGE_SIZE, buffer, sizeof(buffer));
             size_t bytesWrote;
             if((bytesWrote = fwrite(buffer, 1, sizeof(buffer), file)) != sizeof(buffer)) {
